@@ -1,3 +1,14 @@
+;;;; greed.lisp
+;;;
+;;; The main file of my little greed project. See README.txt for details.
+;;;
+;;; Time-stamp: <2017-01-20 21:36:06 Martin>
+;;;
+;;; ToDo
+;;; 1.) Get rid of germen/english mix-up
+;;; 2.) Implement the main game loop as a stub
+;;; 3.) Determine how many dice are scoring ans implement a decision for rolling again.
+;;; 
 (defpackage #:greed
   (:use :cl)
   (:import-from :alexandria :with-gensyms))
@@ -64,14 +75,22 @@
   (make-instance 'player :name name))
 
 ;;; Adding players to the game.
-(defmethod mitspielen ((game game) (player player))
+(defmethod add-player ((game game) (player player))
   "A method to add new players to the game."
   (with-slots (players in-game-p-hash score-hash) game
     (setf players (append players (list player)))
     (setf (gethash player in-game-p-hash) nil)
     (setf (gethash player score-hash) 0)))
 
+;;; Getting the current player
+(defmethod get-current-player ((game game))
+  "Returns the current player in GAME."
+  (with-slots (players current-player-index) game
+    (nth current-player-index players)))
+
+;;; Prompting for user input
 (defun ask-user (format-string &rest format-arguments)
+  "A helper function to ask for the next player's name."
   (format *query-io* "~&~?: " format-string format-arguments)
   (finish-output *query-io*)
   (read-line *query-io*))
@@ -83,71 +102,39 @@
   (with-slots (in-game-p-hash) game
     (gethash player in-game-p-hash)))
 
-
-(defmethod account-dice ((game game) (dice dice-set))
-  (with-slots (in-game-p-hash score-hash) game
-    (let ((player (get-current-player game))
-          (score (score dice)))
-      (if (and (not (in-game-p player game)) (>= score 300))
-          (progn
-            (setf (gethash player in-game-p-hash) t)
-            (format t "Player ~a is now in the game~%" (get-name player))))
-      (if (in-game-p player game)
-          (progn (incf (gethash player score-hash) score)
-                 (format t "Player ~a now has ~a points~%"
-                         (get-name player)
-                         (get-score player game)))))))
-
+;;; Switch to the next player.
 (defmethod next-player ((game game))
+  "Setting the slot current-player-index to the next value."
   (with-slots (current-player-index players) game
     (incf current-player-index)
     (if (= (length players) current-player-index) (setf current-player-index 0))))
 
+;;; Getting the score of the current player
 (defmethod get-score ((player player) (game game))
   (with-slots (score-hash) game (gethash player score-hash)))
 
+;;; Has the current player reached 3,000 points?
 (defmethod end-game-p ((game game))
+  "A predicate if the current player's score exceeds 3,000"
   (<= 3000 (get-score (get-current-player game) game)))
 
-
-(defun neues-spiel ()
-  (let ((spiel (make-game)))
-    (format t "~&~3T Neues Spiel, bitte mindestens zwei Spieler eingeben~%")
-    (with-slots (players in-game-p-hash score-hash) spiel
+;;; Starting a new game, work in progress...
+(defun new-game ()
+  "Starts a new game."
+  (let ((current-game (make-game)))
+    (format t "~&~3T New game, please enter at least two players:~%")
+    (with-slots (players in-game-p-hash score-hash) current-game
       (loop :with player-count = 1
             :for player = (ask-user "Name of player #~D (RET to stop)" player-count)
             :until (and (zerop (length player)) (<= 2 (length players)))
             :if (plusp (length player))
-            :do (mitspielen spiel (make-player player))
+            :do (add-player current-game (make-player player))
                 (incf player-count))
+      ;;; Just looping over the current game until it is fully implemented.
       (loop :for player in players
             :for i :from 1
             :do (format t "~&Player #~D ~A ~A ~A"
-			i (get-name player) (get-score player spiel) (in-game-p player spiel))))))
-
-
-
-;; (defmethod start ((game game))
-;;   (with-slots (players) game
-;;     (if (< (length players) 2) (error (make-condition 'not-enough-players)))
-;;     (set-current-player-index 0 game)
-;;     (loop while (not (eq :end-game (tick game))))))
-
-;; (defmethod tick ((game game))
-;;   (let ((dice (make-dice-set))
-;;         (current-player (get-current-player game)))
-;;     (roll '(0 1 2 3 4) dice)
-;;     (format t "Player ~a rolled ~a. Score ~a~%"
-;;             (get-name current-player)
-;;             (get-dice-set-rolls dice)
-;;             (score dice))
-;;     (roll (decide current-player dice) dice)
-;;     (account-dice game dice)
-;;     (if (end-game-p game) :end-game (next-player game))))
-
-      
-    
-
-
+			i (get-name player) (get-score player current-game) (in-game-p player current-game)))
+      (format t "~&Current player: ~a" (get-name (get-current-player current-game))))))
 
 
