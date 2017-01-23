@@ -2,12 +2,12 @@
 ;;;
 ;;; The main file of my little greed project. See README.txt for details.
 ;;;
-;;; Time-stamp: <2017-01-21 18:30:50 Martin>
+;;; Time-stamp: <2017-01-23 20:53:24 Martin>
 ;;;
 ;;; ToDo
-;;; 1.) Get rid of germen/english mix-up
-;;; 2.) Implement the main game loop as a stub
-;;; 3.) Determine how many dice are scoring ans implement a decision for rolling again.
+;;; DONE! 1.) Get rid of germen/english mix-up
+;;; DONE! 2.) Implement the main game loop as a stub
+;;; 3.) Determine how many dice are scoring and implement a decision for rolling again.
 ;;; 
 (defpackage #:greed
   (:use :cl)
@@ -38,6 +38,11 @@
                             ((> counts 3) (+ 500 (* 50 (- counts 3))))))
                    (otherwise 0))))
            (remove-duplicates dice))))
+
+;;; How many dice are actually scoring
+(defun scoring-p (dice)
+  "Returns the number of scoring dice, i.e. 1, 5 or a triple of 2, 4 or 6."
+  (count-if #'(lambda (x) (or (= x 1) (= x 5) (and (= 3 (count x dice))))) dice))
 
 ;;; The class dice-set
 (defclass dice-set ()
@@ -92,7 +97,7 @@
 ;;; Prompting for user input
 (defun ask-user (format-string &rest format-arguments)
   "A helper function to ask for the next player's name."
-  (format *query-io* "~&~?: " format-string format-arguments)
+  (format *query-io* "~?: " format-string format-arguments)
   (finish-output *query-io*)
   (read-line *query-io*))
 
@@ -112,6 +117,7 @@
 
 ;;; Getting the score of the current player
 (defmethod get-score ((player player) (game game))
+  "Returns the score of the current player."
   (with-slots (score-hash) game (gethash player score-hash)))
 
 ;;; Has the current player reached 3,000 points?
@@ -121,9 +127,9 @@
 
 ;;; Starting a new game, work in progress...
 (defun new-game ()
-  "Starts a new game."
+  "Starts a new game, i.e. adds the players."
   (let ((current-game (make-game)))
-    (format t "~&~3T New game, please enter at least two players:~%")
+    (format t "~3T New game, please enter at least two players:~%")
     (with-slots (players) current-game
       (loop :with player-count = 1
             :for player = (ask-user "Name of player #~D (RET to stop)" player-count)
@@ -131,20 +137,36 @@
             :if (plusp (length player))
             :do (add-player current-game (make-player player))
                 (incf player-count))
-      ;;; Just looping over the current game until it is fully implemented.
+      ;; Just looping over the current game until it is fully implemented.
+      ;; Giving debugging information to check that the players were correctly
+      ;; initialised.
       (loop :for player in players
             :for i :from 1
             :do (dbg :players "~&Player #~D ~A ~A ~A"
-			i (get-name player) (get-score player current-game) (in-game-p player current-game)))
+		     i (get-name player) (get-score player current-game)
+		     (in-game-p player current-game)))
       (dbg :players "~&Current player: ~a" (get-name (get-current-player current-game)))
       (loop ;; :until (end-game-p current-game)
-	    repeat 1
-	    do (play-greed current-game)))))
+	    :with dice = (make-instance 'dice-set)
+	    :repeat 1
+	    :do (play-greed current-game dice)))))
 
-(defmethod play-greed ((game game))
+(defgeneric play-greed (game dice-set))
+
+;;; Playing the game, work in progres...
+;;; Implement the decision taking part (ask user?) and the limits = 0, > 300...
+;;; Update the hashes in the game object...
+(defmethod play-greed ((game game) (dice dice-set))
   (with-slots (players in-game-p-hash score-hash) game
     (loop for player in players
-	    for dice = (make-instance 'dice-set)
-	    for list-of-dice = (roll 5 dice)
-	    do (dbg :players "~& ~A Dice: ~{~D ~} ~D~%" (get-name player) list-of-dice (score list-of-dice)))))
+	  do (loop :until (= 0 number-of-dice) 
+		   :with number-of-dice = 5
+		   :with cumulated-score = 0
+		   :for list-of-dice = (roll number-of-dice dice)
+		   :for score   = (score list-of-dice)
+		   :for scoring = (scoring-p list-of-dice)
+		   :do (decf number-of-dice scoring)
+		       (incf cumulated-score score)
+		       (dbg :players "~& ~A Dice: ~{~D ~} ~D ~D~%"
+			   (get-name player) list-of-dice cumulated-score number-of-dice)))))
 

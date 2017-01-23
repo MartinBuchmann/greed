@@ -30,7 +30,6 @@
   result)
 
 ;;; Tests
-
 (deftest simple-values ()
   (check
     (=   0 (score nil))
@@ -59,12 +58,24 @@
     (= 1100 (score '(1 1 1 3 1)))
     (= 450 (score '(2 4 4 5 4)))))
 
+(deftest scoring? ()
+  (check
+    (= 5 (scoring-p '(1 1 1 1 1)))
+    (= 4 (scoring-p '(1 1 1 5 2)))
+    (= 3 (scoring-p '(1 1 1 2 4)))
+    (= 3 (scoring-p '(5 5 5 4 6)))
+    (= 3 (scoring-p '(2 2 2 4 6)))
+    (= 2 (scoring-p '(1 5 2 4 6)))
+    (= 1 (scoring-p '(1 2 4 4 6)))
+    (= 0 (scoring-p '(2 2 4 4 6)))))
+
 (deftest scoring-tests ()
   (combine-results
     (simple-values)
     (different-dices)
     (triples)
-    (mixed-sums)))
+    (mixed-sums)
+    (scoring?)))
 
 (deftest test-create-dice-set ()
     ;; tests making an instance of the dice-set
@@ -128,3 +139,12 @@
     (dice-tests)))
 
 (greed-tests)
+
+;;; Some test objects
+(defvar *spiel* (make-instance 'game))
+(defvar *spieler1* (make-instance 'player :name "Martin"))
+(defvar *spieler2* (make-instance 'player :name "André"))
+(defvar *dice* (make-instance 'dice-set))
+
+(add-player *spiel* *spieler1*)
+(add-player *spiel* *spieler2*)
