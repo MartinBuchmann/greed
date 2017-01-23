@@ -2,7 +2,7 @@
 ;;;
 ;;; The main file of my little greed project. See README.txt for details.
 ;;;
-;;; Time-stamp: <2017-01-20 21:36:06 Martin>
+;;; Time-stamp: <2017-01-21 18:30:50 Martin>
 ;;;
 ;;; ToDo
 ;;; 1.) Get rid of germen/english mix-up
@@ -26,6 +26,7 @@
           (mapcar
            #'(lambda (die)
                (let ((counts (count die dice)))
+		 (dbg :score "~&Die: ~D Counts: ~D~%" die counts)
                  (case die
                    (1 (cond ((< counts 3) (* 100 counts))
                             ((= counts 3) 1000)
@@ -123,7 +124,7 @@
   "Starts a new game."
   (let ((current-game (make-game)))
     (format t "~&~3T New game, please enter at least two players:~%")
-    (with-slots (players in-game-p-hash score-hash) current-game
+    (with-slots (players) current-game
       (loop :with player-count = 1
             :for player = (ask-user "Name of player #~D (RET to stop)" player-count)
             :until (and (zerop (length player)) (<= 2 (length players)))
@@ -133,8 +134,17 @@
       ;;; Just looping over the current game until it is fully implemented.
       (loop :for player in players
             :for i :from 1
-            :do (format t "~&Player #~D ~A ~A ~A"
+            :do (dbg :players "~&Player #~D ~A ~A ~A"
 			i (get-name player) (get-score player current-game) (in-game-p player current-game)))
-      (format t "~&Current player: ~a" (get-name (get-current-player current-game))))))
+      (dbg :players "~&Current player: ~a" (get-name (get-current-player current-game)))
+      (loop ;; :until (end-game-p current-game)
+	    repeat 1
+	    do (play-greed current-game)))))
 
+(defmethod play-greed ((game game))
+  (with-slots (players in-game-p-hash score-hash) game
+    (loop for player in players
+	    for dice = (make-instance 'dice-set)
+	    for list-of-dice = (roll 5 dice)
+	    do (dbg :players "~& ~A Dice: ~{~D ~} ~D~%" (get-name player) list-of-dice (score list-of-dice)))))
 
