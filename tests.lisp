@@ -133,13 +133,6 @@
     (test-dice-values-should-change-between-rolls)
     (test-you-can-roll-different-numbers-of-dice)))
 
-(deftest greed-tests ()
-  (combine-results
-    (scoring-tests)
-    (dice-tests)))
-
-(greed-tests)
-
 ;;; Some test objects
 (defvar *spiel* (make-instance 'game))
 (defvar *spieler1* (make-instance 'player :name "Martin"))
@@ -148,3 +141,28 @@
 
 (add-player *spiel* *spieler1*)
 (add-player *spiel* *spieler2*)
+
+(setf (gethash *spieler1* (score-hash *spiel*)) 3100)
+(setf (gethash *spieler2* (score-hash *spiel*)) 2700)
+
+(deftest end-game ()
+  (format t "Current player: ~A, Score: ~D"
+	  (get-name (get-current-player *spiel*))
+	  (get-score (get-current-player *spiel*) *spiel*))
+  (check
+    (eq t (end-game-p *spiel*)))
+  (next-player *spiel*)
+  (format t "Current player: ~A, Score: ~D"
+	  (get-name (get-current-player *spiel*))
+	  (get-score (get-current-player *spiel*) *spiel*))
+  (check
+    (eq nil (end-game-p *spiel*))))
+
+(deftest greed-tests ()
+  (combine-results
+    (scoring-tests)
+    (dice-tests)
+    (end-game)))
+
+(greed-tests)
+

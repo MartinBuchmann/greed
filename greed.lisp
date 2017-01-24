@@ -2,7 +2,7 @@
 ;;;
 ;;; The main file of my little greed project. See README.txt for details.
 ;;;
-;;; Time-stamp: <2017-01-23 20:53:24 Martin>
+;;; Time-stamp: <2017-01-24 22:22:04 Martin>
 ;;;
 ;;; ToDo
 ;;; DONE! 1.) Get rid of germen/english mix-up
@@ -66,7 +66,7 @@
   ((players :reader get-player :initform '())
    (current-player-index :initform 0)
    (in-game-p-hash :initform (make-hash-table))
-   (score-hash :initform (make-hash-table))))
+   (score-hash :initform (make-hash-table) :accessor score-hash)))
 
 (defun make-game ()
   "Returning a new instance of the game class."
@@ -96,17 +96,10 @@
 
 ;;; Prompting for user input
 (defun ask-user (format-string &rest format-arguments)
-  "A helper function to ask for the next player's name."
+  "A helper function to ask for some user's input."
   (format *query-io* "~?: " format-string format-arguments)
   (finish-output *query-io*)
   (read-line *query-io*))
-
-;;; Chechking who is already in the game, i.e. scored more than 300
-;;; points.
-(defmethod in-game-p ((player player) (game game))
-  "A predicate to see which players are already in the game."
-  (with-slots (in-game-p-hash) game
-    (gethash player in-game-p-hash)))
 
 ;;; Switch to the next player.
 (defmethod next-player ((game game))
@@ -114,6 +107,13 @@
   (with-slots (current-player-index players) game
     (incf current-player-index)
     (if (= (length players) current-player-index) (setf current-player-index 0))))
+
+;;; Chechking who is already in the game, i.e. scored more than 300
+;;; points.
+(defmethod in-game-p ((player player) (game game))
+  "A predicate to see which players are already in the game."
+  (with-slots (in-game-p-hash) game
+    (gethash player in-game-p-hash)))
 
 ;;; Getting the score of the current player
 (defmethod get-score ((player player) (game game))
@@ -125,19 +125,24 @@
   "A predicate if the current player's score exceeds 3,000"
   (<= 3000 (get-score (get-current-player game) game)))
 
-;;; Starting a new game, work in progress...
+;;; Starting a new game This function will ask for the players (at least two)
+;;; and initialise the corresponding game object.  It will then call
+;;; 'play-greed' until one player has reached 3,000 points.
+;;; ToDo:
+;;; * Test wether the game is ended correctly
+;;; * Add some output information about how has won, etc.
 (defun new-game ()
   "Starts a new game, i.e. adds the players."
-  (let ((current-game (make-game)))
+  (let ((current-game (make-game))
+	(dice (make-instance 'dice-set)))
     (format t "~3T New game, please enter at least two players:~%")
-    (with-slots (players) current-game
+    (with-slots (players score-hash) current-game
       (loop :with player-count = 1
             :for player = (ask-user "Name of player #~D (RET to stop)" player-count)
             :until (and (zerop (length player)) (<= 2 (length players)))
             :if (plusp (length player))
             :do (add-player current-game (make-player player))
                 (incf player-count))
-      ;; Just looping over the current game until it is fully implemented.
       ;; Giving debugging information to check that the players were correctly
       ;; initialised.
       (loop :for player in players
@@ -146,27 +151,52 @@
 		     i (get-name player) (get-score player current-game)
 		     (in-game-p player current-game)))
       (dbg :players "~&Current player: ~a" (get-name (get-current-player current-game)))
-      (loop ;; :until (end-game-p current-game)
-	    :with dice = (make-instance 'dice-set)
-	    :repeat 1
-	    :do (play-greed current-game dice)))))
+      (loop :until (end-game-p current-game)
+	    :do (play-greed current-game dice)
+		(format t "~& ~A's total score: ~D~%"
+		       (get-name (get-current-player current-game))
+		       (gethash (get-current-player current-game) score-hash))
+		(next-player current-game)))))
+
+;;; Asking the player if he/she wants to continue.
+(defun continue? ()
+  "A helper function to ask for some user's input."
+  (y-or-n-p "~&~3TContinue to roll the dice?"))
 
 (defgeneric play-greed (game dice-set))
 
-;;; Playing the game, work in progres...
-;;; Implement the decision taking part (ask user?) and the limits = 0, > 300...
-;;; Update the hashes in the game object...
-(defmethod play-greed ((game game) (dice dice-set))
-  (with-slots (players in-game-p-hash score-hash) game
-    (loop for player in players
-	  do (loop :until (= 0 number-of-dice) 
-		   :with number-of-dice = 5
-		   :with cumulated-score = 0
-		   :for list-of-dice = (roll number-of-dice dice)
-		   :for score   = (score list-of-dice)
-		   :for scoring = (scoring-p list-of-dice)
-		   :do (decf number-of-dice scoring)
-		       (incf cumulated-score score)
-		       (dbg :players "~& ~A Dice: ~{~D ~} ~D ~D~%"
-			   (get-name player) list-of-dice cumulated-score number-of-dice)))))
+;;; Debugging information
+;; (start-debug :players)
+;; (undebug :players)
 
+;;; Playing the game, work in progress...
+;;; ToDo:
+;;; * Proving it's working for all cases
+;;; * Chechling wether the cumulation of scores takes place in the right order.
+(defmethod play-greed ((game game) (dice dice-set))
+  "Rolling the dice..."
+  (with-slots (in-game-p-hash score-hash) game
+   (loop :named play-greed
+	 :with number-of-dice = 5
+	 :with cumulated-score = 0
+	 :with player = (get-current-player game)
+	 :for list-of-dice = (roll number-of-dice dice)
+	 :for score   = (score list-of-dice)
+	 :for scoring = (scoring-p list-of-dice)
+	 :do
+	    (format t "~& ~A rolls: ~{~D ~} scoring: ~D cumulated in this turn: ~D~%"
+		 (get-name player) list-of-dice score cumulated-score)
+	    (cond ((zerop score)
+		   (setf cumulated-score 0)
+		   (return-from play-greed))
+		  ((in-game-p player game)
+		   (decf number-of-dice scoring)
+		   (incf cumulated-score score))
+		  ((and (<= 300 score) (not (gethash player in-game-p-hash)))
+		   (format t "~&~5T~A is now in the game!" (get-name player))
+		   (setf (gethash player in-game-p-hash) t)
+		   (decf number-of-dice scoring)
+		   (incf cumulated-score score))
+		  (t (return-from play-greed)))
+	 :while (and (continue?) (< 0 number-of-dice))
+	 :finally (incf (gethash player score-hash) cumulated-score))))
