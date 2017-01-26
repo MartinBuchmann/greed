@@ -1,7 +1,8 @@
-;;; Time-stamp: <2017-01-21 16:54:36 Martin>
+;;; Time-stamp: <2017-01-26 21:31:20 Martin>
 
-This is the README.txt for the my "greed" project.  A simple dice game writen
-in Common Lisp inspired by Google's Lisp Koans
+This is the README.txt for the my "greed" project.
+
+A simple dice game writen in Common Lisp inspired by Google's Lisp Koans:
 
 = Playing Greed
 

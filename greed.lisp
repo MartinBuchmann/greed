@@ -2,18 +2,22 @@
 ;;;
 ;;; The main file of my little greed project. See README.txt for details.
 ;;;
-;;; Time-stamp: <2017-01-24 22:22:04 Martin>
+;;; Time-stamp: <2017-01-26 21:29:02 Martin>
 ;;;
-;;; ToDo
-;;; DONE! 1.) Get rid of germen/english mix-up
-;;; DONE! 2.) Implement the main game loop as a stub
-;;; 3.) Determine how many dice are scoring and implement a decision for rolling again.
-;;; 
-(defpackage #:greed
-  (:use :cl)
-  (:import-from :alexandria :with-gensyms))
-
 (in-package #:greed)
+
+(defparameter *max-score* 1000 "The winning score")
+
+;;; The generic functions
+(defgeneric play-greed (game dice-set))
+(defgeneric get-values (dice-set))
+(defgeneric roll (x dice-set))
+(defgeneric add-player (game player))
+(defgeneric get-current-player (game))
+(defgeneric next-player (game))
+(defgeneric in-game-p (player game))
+(defgeneric get-score (player game))
+(defgeneric end-game-p (game))
 
 ;;; Debugging
 ;;; (start-debug :score)
@@ -120,17 +124,16 @@
   "Returns the score of the current player."
   (with-slots (score-hash) game (gethash player score-hash)))
 
-;;; Has the current player reached 3,000 points?
+;;; Has the current player reached *max-score*?
 (defmethod end-game-p ((game game))
   "A predicate if the current player's score exceeds 3,000"
-  (<= 3000 (get-score (get-current-player game) game)))
+  (<= *max-score* (get-score (get-current-player game) game)))
 
 ;;; Starting a new game This function will ask for the players (at least two)
 ;;; and initialise the corresponding game object.  It will then call
-;;; 'play-greed' until one player has reached 3,000 points.
+;;; 'play-greed' until one player has reached *max-score* points.
 ;;; ToDo:
 ;;; * Test wether the game is ended correctly
-;;; * Add some output information about how has won, etc.
 (defun new-game ()
   "Starts a new game, i.e. adds the players."
   (let ((current-game (make-game))
@@ -151,28 +154,26 @@
 		     i (get-name player) (get-score player current-game)
 		     (in-game-p player current-game)))
       (dbg :players "~&Current player: ~a" (get-name (get-current-player current-game)))
-      (loop :until (end-game-p current-game)
-	    :do (play-greed current-game dice)
+      (loop :do (play-greed current-game dice)
 		(format t "~& ~A's total score: ~D~%"
-		       (get-name (get-current-player current-game))
-		       (gethash (get-current-player current-game) score-hash))
-		(next-player current-game)))))
+			(get-name (get-current-player current-game))
+			(gethash (get-current-player current-game) score-hash))
+	    :until (end-game-p current-game)
+	    :do (next-player current-game)
+	    :finally (format t "~&The winner is: ~A with ~D points!"
+			     (get-name (get-current-player current-game))
+			     (gethash (get-current-player current-game) score-hash))))))
 
 ;;; Asking the player if he/she wants to continue.
 (defun continue? ()
   "A helper function to ask for some user's input."
   (y-or-n-p "~&~3TContinue to roll the dice?"))
 
-(defgeneric play-greed (game dice-set))
-
 ;;; Debugging information
 ;; (start-debug :players)
 ;; (undebug :players)
 
-;;; Playing the game, work in progress...
-;;; ToDo:
-;;; * Proving it's working for all cases
-;;; * Chechling wether the cumulation of scores takes place in the right order.
+;;; Playing the game...
 (defmethod play-greed ((game game) (dice dice-set))
   "Rolling the dice..."
   (with-slots (in-game-p-hash score-hash) game
@@ -185,7 +186,7 @@
 	 :for scoring = (scoring-p list-of-dice)
 	 :do
 	    (format t "~& ~A rolls: ~{~D ~} scoring: ~D cumulated in this turn: ~D~%"
-		 (get-name player) list-of-dice score cumulated-score)
+		 (get-name player) list-of-dice score (+ score cumulated-score))
 	    (cond ((zerop score)
 		   (setf cumulated-score 0)
 		   (return-from play-greed))
